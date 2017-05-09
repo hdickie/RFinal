@@ -1,0 +1,140 @@
+---
+title: "Young People SUrvey"
+author: "Hume Dickie"
+date: "May 8, 2017"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r load}
+data <- read.csv("youngPeople_responses.csv")
+backup <- data
+columns <-read.csv("youngPeople_columns.csv")
+categoricalResponses <- c(74,75,108,109,133,145,146,147,148,149,150)
+
+musicCols <- as.data.frame(data[,1:19])
+movieCols <- as.data.frame(data[,20:31])
+hobbyCols <- as.data.frame(data[,32:63])
+phobiaCols<- as.data.frame(data[,64:73])
+healthCols <- as.data.frame(data[,74:76])
+personalityCols <- as.data.frame(data[,77:133])
+moneyCols <- as.data.frame(data[,134:140])
+demogCols <- as.data.frame(data[,141:150])
+
+#View(musicCols)
+#View(movieCols)
+#View(hobbyCols)
+#View(phobiaCols)
+#View(healthCols)
+#View(personalityCols)
+#View(moneyCols)
+#View(demogCols)
+```
+
+```{r clustering}
+library(cluster)
+library(ggplot2)
+library(Rtsne)
+library(magrittr)
+library(dplyr)
+
+#Partitioning around Mediods
+gower_dist <- as.matrix(daisy(data, metric = "gower"))
+names(data)
+
+sil_width <- c(NA)
+
+for(i in 2:10){
+  pam_fit <- pam(gower_dist, diss = TRUE, k = i)
+  sil_width[i] <- pam_fit$silinfo$avg.width
+}
+
+silh <- as.data.frame(cbind(2:10,sil_width[2:10]))
+names(silh) <- c("n","silW")
+silh
+
+ggplot(silh,mapping = aes(x = n, y = silW)) +
+    geom_point() + 
+    geom_line()
+#not really fit for clustering overall
+
+
+tsne.obj <- Rtsne(gower_dist, is_distance = TRUE)
+
+pam_fit <- pam(gower_dist, diss = TRUE, k = 2)
+
+tsne_data <- tsne.obj$Y %>%
+  data.frame() %>%
+  setNames(c("X", "Y")) %>%
+  mutate(cluster = factor(pam_fit$clustering))
+
+
+ggplot(aes(x = X, y = Y), data = tsne_data) +
+  geom_point(aes(color = cluster))
+
+names(pam_fit)
+medRows <- pam_fit[names(pam_fit)[1]]
+med1 <- data[as.numeric(medRows[[1]][[1]]),]
+med2 <- data[as.numeric(medRows[[1]][[2]]),]
+
+medoids <- as.data.frame(rbind(med1,med2))
+View(medoids)
+#try to extract more info about mediods
+```
+
+```{r subsetCLustering}
+dist.music <- as.matrix(daisy(musicCols, metric = "gower"))
+dist.movie <- as.matrix(daisy(movieCols, metric = "gower"))
+dist.hobby <- as.matrix(daisy(hobbyCols, metric = "gower"))
+dist.phobia <- as.matrix(daisy(phobiaCols, metric = "gower"))
+dist.health <- as.matrix(daisy(healthCols, metric = "gower"))
+dist.person <- as.matrix(daisy(personalityCols, metric = "gower"))
+dist.money <- as.matrix(daisy(moneyCols, metric = "gower"))
+dist.demog <- as.matrix(daisy(demogCols, metric = "gower"))
+
+#minus health and money
+dist.all <- list(dist.music,dist.movie,dist.hobby,dist.phobia,dist.person,dist.demog)
+
+par(mfrow = c(3,2))
+for (z in 1:6) {
+  curr.sw <- c(NA)
+  for(i in 2:10){
+    curr.fit <- pam(dist.all[[z]], diss = TRUE, k = i)
+    curr.sw[i] <- curr.fit$silinfo$avg.width
+  }
+  
+  curr.plot <- as.data.frame(cbind(2:10,curr.sw[2:10]))
+  names(curr.plot) <- c("n","silW")
+  
+  plot(2:10,curr.sw[2:10])
+  lines(2:10,curr.sw[2:10])
+  
+  #ggplot(curr.plot,aes(n,silW)) +
+  #  geom_point() +
+  #  geom_line()
+}
+#I think only demographic can benefit from clustering
+
+
+```
+
+```{r demogCluster}
+library(Rtsne)
+demog.cluster <- curr.fit <- pam(dist.demog, diss = TRUE, k = 6)
+tsne.obj <- Rtsne(gower_dist, is_distance = TRUE)
+    
+tsne_data <- tsne.obj$Y %>%
+  data.frame() %>%
+  setNames(c("X", "Y")) %>%
+  mutate(cluster = factor(demog.cluster$clustering))
+
+ggplot(aes(x = X, y = Y), data = tsne_data) +
+      geom_point(aes(color = cluster, size = 6, alpha = 0.5))
+
+for ( i in 1:150) {
+  na.cnt[[i]] <- summary(data[,i])[7]
+}
+```

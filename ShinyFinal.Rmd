@@ -1,0 +1,47 @@
+---
+title: "ShinyFinal"
+author: "Hume Dickie"
+date: "May 9, 2017"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r shinyApp}
+
+library(shiny)
+library(ggplot2)
+
+columns <-read.csv("youngPeople_columns.csv")
+
+q <- list()
+
+for (i in 1:150) {
+  lab <- cat("Question ",str(i),sep="")
+  q[[i]] <- radioButtons(inputId = cat("q",toString(i),sep=""), label = , choices = c(1,2,3,4,5))
+}
+
+ui <- fluidPage(q,
+                
+                plotOutput(outputId = "scatterplot"))
+
+server <- function(input, output) {
+    output$scatterplot <- renderPlot({
+      
+      x <- rnorm(input$n, mean = input$mean.x, sd = input$sd.x)
+      y <- rnorm(input$n, mean = input$mean.y, sd = input$sd.y)
+      
+      d <- data.frame(cbind(x,y))
+      
+      ggplot(d, aes(x,y)) +
+        geom_point() +
+        xlim(-20,20) + 
+        ylim(-20,20) +
+        geom_smooth(method="lm", formula = y ~ x)
+    })
+}
+
+shinyApp(ui = ui, server = server)
+```
