@@ -15,6 +15,9 @@ backup <- data
 columns <-read.csv("youngPeople_columns.csv")
 categoricalResponses <- c(74,75,108,109,133,145,146,147,148,149,150)
 
+data[is.na(data)] <- 3
+names(data)[2] <- "Faster Songs"
+
 musicCols <- as.data.frame(data[,1:19])
 movieCols <- as.data.frame(data[,20:31])
 hobbyCols <- as.data.frame(data[,32:63])
@@ -23,6 +26,8 @@ healthCols <- as.data.frame(data[,74:76])
 personalityCols <- as.data.frame(data[,77:133])
 moneyCols <- as.data.frame(data[,134:140])
 demogCols <- as.data.frame(data[,141:150])
+
+
 
 #View(musicCols)
 #View(movieCols)
@@ -43,11 +48,10 @@ library(dplyr)
 
 #Partitioning around Mediods
 gower_dist <- as.matrix(daisy(data, metric = "gower"))
-names(data)
 
 sil_width <- c(NA)
 
-for(i in 2:10){
+for(i in 2:10){+-
   pam_fit <- pam(gower_dist, diss = TRUE, k = i)
   sil_width[i] <- pam_fit$silinfo$avg.width
 }
@@ -81,7 +85,6 @@ med1 <- data[as.numeric(medRows[[1]][[1]]),]
 med2 <- data[as.numeric(medRows[[1]][[2]]),]
 
 medoids <- as.data.frame(rbind(med1,med2))
-View(medoids)
 #try to extract more info about mediods
 ```
 
@@ -136,5 +139,202 @@ ggplot(aes(x = X, y = Y), data = tsne_data) +
 
 for ( i in 1:150) {
   na.cnt[[i]] <- summary(data[,i])[7]
+}
+```
+
+```{r medoids}
+
+m1.low <- list()
+m1.hi <- list()
+m1.curr <- 1
+m2.low <- list()
+m2.hi <- list()
+m2.curr <- 1
+
+for (i in 1:150) {
+  if (data[1,i] != data[2,i]) {
+    if (data[1,i] == "5") {
+      m1.hi[m1.curr] <- i
+      m1.curr <- m1.curr + 1
+    }
+    
+    if (data[2,i] == "5") {
+      m2.hi[m2.curr] <- i
+      m2.curr <- m2.curr + 1
+    }
+  }
+}
+
+m1.curr <- 1
+m2.curr <- 1
+for (i in 1:150) {
+  if (data[1,i] != data[2,i]) {
+    if (data[1,i] == "1") {
+      m1.low[m1.curr] <- i
+      m1.curr <- m1.curr + 1
+    }
+    
+    if (data[2,i] == "1") {
+      m2.low[m2.curr] <- i
+      m2.curr <- m2.curr + 1
+    }
+  }
+}
+
+for (h in m2.low) {
+  print(names(data)[h])
+}
+```
+
+```{r radarChart}
+library(fmsb)
+
+personality.numeric <- as.data.frame(personalityCols[,c(-32,-33,-57)])
+demog.numeric <- demogCols[,c(1,2,3,4)]
+hobb.1 <- c(1,4,5,7,8,10,12,14,15,28,31) #most dedication
+hobb.2 <- c(2,3,9,11,17,18,22,24,25,29)
+hobb.3 <- c(6,13,16,19,20,21,23,26,27,30,32) #least dedication
+
+pers.emotion <- c(4,9,16,18,19,20,21,22,24,27,30,  36,42,43,48,49)
+pers.pers <- c(6,8,10,13,17,25,28,29,44,45,49,50,51)
+pers.3 <- c(1,2,3,5,7,11,12,14,15,23,26,31,32,33)
+pers.4 <- c(35,36,37,38,39,42,43,48,52,53,54)
+
+
+names(musicCols)[2] <- "Faster Songs"
+
+dfs <- list(musicCols,
+            movieCols,
+            hobbyCols[,hobb.1], hobbyCols[,hobb.2], hobbyCols[,hobb.3],
+            phobiaCols,
+            personality.numeric[,pers.emotion],personality.numeric[,pers.pers],personality.numeric[,pers.3],personality.numeric[,pers.4],
+            moneyCols,
+            demog.numeric)
+
+radar.inputs <- list()
+
+for (i in 1:length(dfs)) {
+  curr <- dfs[[i]]
+  
+  print(i)
+  
+  max.rad <- apply(curr,2,max)
+  min.rad <- apply(curr,2,min)
+  
+  mean.rad <- dfs[[i]] %>%
+    apply(2,as.numeric) %>%
+    apply (2,mean) %>%
+    t() %>%
+    as.data.frame()
+  
+  
+  radar.temp <- rbind(max.rad,min.rad,mean.rad) %>%
+    as.data.frame()
+  
+  
+  radar.inputs[[i]] <- radar.temp
+}
+
+
+
+
+
+
+
+
+
+
+#need subsets for hobbies and personality
+
+
+for (i in 1:length(dfs)) {
+  radarchart(radar.inputs[[i]],axistype = 0, pfcol = rgb(0.28,0.28,1,.5))
+}
+```
+
+Just rewritten code above for use in the app
+```{r cleanAndProcess}
+library(cluster)
+library(ggplot2)
+library(Rtsne)
+library(magrittr)
+library(dplyr)
+library(fmsb)
+
+data <- read.csv("youngPeople_responses.csv")
+
+data[is.na(data)] <- 3
+names(data)[2] <- "Faster Songs"
+
+musicCols <- as.data.frame(data[,1:19])
+movieCols <- as.data.frame(data[,20:31])
+hobbyCols <- as.data.frame(data[,32:63])
+phobiaCols<- as.data.frame(data[,64:73])
+healthCols <- as.data.frame(data[,74:76])
+personalityCols <- as.data.frame(data[,77:133])
+moneyCols <- as.data.frame(data[,134:140])
+demogCols <- as.data.frame(data[,141:150])
+
+personality.numeric <- as.data.frame(personalityCols[,c(-32,-33,-57)])
+demog.numeric <- demogCols[,c(1,2,3,4)]
+hobb.1 <- c(1,4,5,7,8,10,12,14,15,28,31) #most dedication
+hobb.2 <- c(2,3,9,11,17,18,22,24,25,29)
+hobb.3 <- c(6,13,16,19,20,21,23,26,27,30,32) #least dedication
+
+pers.emotion <- c(4,9,16,18,19,20,21,22,24,27,30,  36,42,43,48,49)
+pers.pers <- c(6,8,10,13,17,25,28,29,44,45,49,50,51)
+pers.3 <- c(1,2,3,5,7,11,12,14,15,23,26,31,32,33)
+pers.4 <- c(35,36,37,38,39,42,43,48,52,53,54)
+
+
+dfs <- list(musicCols,
+            movieCols,
+            hobbyCols[,hobb.1], hobbyCols[,hobb.2], hobbyCols[,hobb.3],
+            phobiaCols,
+            personality.numeric[,pers.emotion],personality.numeric[,pers.pers],personality.numeric[,pers.3],personality.numeric[,pers.4],
+            moneyCols,
+            demog.numeric)
+
+radar.inputs <- list()
+
+for (i in 1:length(dfs)) {
+  curr <- dfs[[i]]
+  
+  print(i)
+  
+  max.rad <- apply(curr,2,max)
+  min.rad <- apply(curr,2,min)
+  
+  mean.rad <- dfs[[i]] %>%
+    apply(2,as.numeric) %>%
+    apply (2,mean) %>%
+    t() %>%
+    as.data.frame()
+  
+  
+  radar.temp <- rbind(max.rad,min.rad,mean.rad) %>%
+    as.data.frame()
+  
+  
+  radar.inputs[[i]] <- radar.temp
+}
+
+color <- list(rgb(244/255,65/255,65/255,.5),
+      rgb(244/255,155/255,65/255,.5),
+      rgb(244/255,244/255,65/255,.5),
+      rgb(157/255,244/255,65/255,.5),
+      rgb(66/255,244/255,65/255,.5),
+      rgb(66/255,244/255,146/255,.5),
+      rgb(66/255,244/255,217/255,.5),
+      rgb(66/255,209/255,244/255,.5),
+      rgb(66/255,152/255,244/255,.5),
+      rgb(66/255,92/255,244/255,.5),
+      rgb(110/255,66/255,244/255,.5),
+      rgb(155/255,66/255,244/255,.5))
+
+radars <- list()
+
+for (i in 1:length(dfs)) {
+  radars[[i]] <- radarchart(radar.inputs[[i]],axistype = 0, pfcol = color[[i]])
 }
 ```
